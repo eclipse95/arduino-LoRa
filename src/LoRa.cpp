@@ -223,7 +223,7 @@ bool LoRaClass::isTransmitting()
 int LoRaClass::parsePacket(int size)
 {
   int packetLength = 0;
-  int irqFlags = readRegister(REG_IRQ_FLAGS);
+  const int irqFlags = readRegister(REG_IRQ_FLAGS);
 
   if (size > 0) {
     implicitHeaderMode();
@@ -265,14 +265,14 @@ int LoRaClass::parsePacket(int size)
   return packetLength;
 }
 
-int LoRaClass::packetRssi()
+inline int LoRaClass::packetRssi()
 {
   return (readRegister(REG_PKT_RSSI_VALUE) - (_frequency < RF_MID_BAND_THRESHOLD ? RSSI_OFFSET_LF_PORT : RSSI_OFFSET_HF_PORT));
 }
 
-float LoRaClass::packetSnr()
+inline float LoRaClass::packetSnr()
 {
-  return ((int8_t)readRegister(REG_PKT_SNR_VALUE)) * 0.25;
+  return 0.25f * readRegister(REG_PKT_SNR_VALUE);
 }
 
 long LoRaClass::packetFrequencyError()
@@ -288,25 +288,25 @@ long LoRaClass::packetFrequencyError()
      freqError -= 524288; // 0b1000'0000'0000'0000'0000
   }
 
-  const float fXtal = 32E6; // FXOSC: crystal oscillator (XTAL) frequency (2.5. Chip Specification, p. 14)
+  constexpr float fXtal = 32E6f; // FXOSC: crystal oscillator (XTAL) frequency (2.5. Chip Specification, p. 14)
   const float fError = ((static_cast<float>(freqError) * (1L << 24)) / fXtal) * (getSignalBandwidth() / 500000.0f); // p. 37
 
   return static_cast<long>(fError);
 }
 
-int LoRaClass::rssi()
+inline int LoRaClass::rssi()
 {
   return (readRegister(REG_RSSI_VALUE) - (_frequency < RF_MID_BAND_THRESHOLD ? RSSI_OFFSET_LF_PORT : RSSI_OFFSET_HF_PORT));
 }
 
-size_t LoRaClass::write(uint8_t byte)
+inline size_t LoRaClass::write(uint8_t byte)
 {
   return write(&byte, sizeof(byte));
 }
 
 size_t LoRaClass::write(const uint8_t *buffer, size_t size)
 {
-  int currentLength = readRegister(REG_PAYLOAD_LENGTH);
+  const int currentLength = readRegister(REG_PAYLOAD_LENGTH);
 
   // check size
   if ((currentLength + size) > MAX_PKT_LENGTH) {
@@ -324,7 +324,7 @@ size_t LoRaClass::write(const uint8_t *buffer, size_t size)
   return size;
 }
 
-int LoRaClass::available()
+inline int LoRaClass::available()
 {
   return (readRegister(REG_RX_NB_BYTES) - _packetIndex);
 }
@@ -347,10 +347,10 @@ int LoRaClass::peek()
   }
 
   // store current FIFO address
-  int currentAddress = readRegister(REG_FIFO_ADDR_PTR);
+  const int currentAddress = readRegister(REG_FIFO_ADDR_PTR);
 
   // read
-  uint8_t b = readRegister(REG_FIFO);
+  const uint8_t b = readRegister(REG_FIFO);
 
   // restore FIFO address
   writeRegister(REG_FIFO_ADDR_PTR, currentAddress);
@@ -358,7 +358,7 @@ int LoRaClass::peek()
   return b;
 }
 
-void LoRaClass::flush()
+inline void LoRaClass::flush()
 {
 }
 
@@ -440,12 +440,12 @@ void LoRaClass::channelActivityDetection(void)
 }
 #endif
 
-void LoRaClass::idle()
+inline void LoRaClass::idle()
 {
   writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_STDBY);
 }
 
-void LoRaClass::sleep()
+inline void LoRaClass::sleep()
 {
   writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_SLEEP);
 }
@@ -491,14 +491,14 @@ void LoRaClass::setFrequency(long frequency)
 {
   _frequency = frequency;
 
-  uint64_t frf = ((uint64_t)frequency << 19) / 32000000;
+  const uint64_t frf = ((uint64_t)frequency << 19) / 32000000;
 
   writeRegister(REG_FRF_MSB, (uint8_t)(frf >> 16));
   writeRegister(REG_FRF_MID, (uint8_t)(frf >> 8));
   writeRegister(REG_FRF_LSB, (uint8_t)(frf >> 0));
 }
 
-int LoRaClass::getSpreadingFactor()
+inline int LoRaClass::getSpreadingFactor()
 {
   return readRegister(REG_MODEM_CONFIG_2) >> 4;
 }
@@ -525,7 +525,7 @@ void LoRaClass::setSpreadingFactor(int sf)
 
 long LoRaClass::getSignalBandwidth()
 {
-  byte bw = (readRegister(REG_MODEM_CONFIG_1) >> 4);
+  const byte bw = (readRegister(REG_MODEM_CONFIG_1) >> 4);
 
   switch (bw) {
     case 0: return 7.8E3;
@@ -576,10 +576,10 @@ void LoRaClass::setSignalBandwidth(long sbw)
 void LoRaClass::setLdoFlag()
 {
   // Section 4.1.1.5
-  long symbolDuration = 1000 / ( getSignalBandwidth() / (1L << getSpreadingFactor()) ) ;
+  const long symbolDuration = 1000 / ( getSignalBandwidth() / (1L << getSpreadingFactor()) ) ;
 
   // Section 4.1.1.6
-  boolean ldoOn = symbolDuration > 16;
+  const boolean ldoOn = symbolDuration > 16;
 
   uint8_t config3 = readRegister(REG_MODEM_CONFIG_3);
   bitWrite(config3, 3, ldoOn);
@@ -601,50 +601,50 @@ void LoRaClass::setCodingRate4(int denominator)
     denominator = 8;
   }
 
-  int cr = denominator - 4;
+  const int cr = denominator - 4;
 
   writeRegister(REG_MODEM_CONFIG_1, (readRegister(REG_MODEM_CONFIG_1) & 0xf1) | (cr << 1));
 }
 
-void LoRaClass::setPreambleLength(long length)
+inline void LoRaClass::setPreambleLength(long length)
 {
   writeRegister(REG_PREAMBLE_MSB, (uint8_t)(length >> 8));
   writeRegister(REG_PREAMBLE_LSB, (uint8_t)(length >> 0));
 }
 
-void LoRaClass::setSyncWord(int sw)
+inline void LoRaClass::setSyncWord(int sw)
 {
   writeRegister(REG_SYNC_WORD, sw);
 }
 
-void LoRaClass::enableCrc()
+inline void LoRaClass::enableCrc()
 {
   writeRegister(REG_MODEM_CONFIG_2, readRegister(REG_MODEM_CONFIG_2) | 0x04);
 }
 
-void LoRaClass::disableCrc()
+inline void LoRaClass::disableCrc()
 {
   writeRegister(REG_MODEM_CONFIG_2, readRegister(REG_MODEM_CONFIG_2) & 0xfb);
 }
 
-void LoRaClass::enableInvertIQ()
+inline void LoRaClass::enableInvertIQ()
 {
   writeRegister(REG_INVERTIQ,  0x66);
   writeRegister(REG_INVERTIQ2, 0x19);
 }
 
-void LoRaClass::disableInvertIQ()
+inline void LoRaClass::disableInvertIQ()
 {
   writeRegister(REG_INVERTIQ,  0x27);
   writeRegister(REG_INVERTIQ2, 0x1d);
 }
 
-void LoRaClass::enableLowDataRateOptimize()
+inline void LoRaClass::enableLowDataRateOptimize()
 {
    setLdoFlagForced(true);
 }
 
-void LoRaClass::disableLowDataRateOptimize()
+inline void LoRaClass::disableLowDataRateOptimize()
 {
    setLdoFlagForced(false);
 }
@@ -688,31 +688,31 @@ void LoRaClass::setGain(uint8_t gain)
   }
 }
 
-byte LoRaClass::random()
+inline byte LoRaClass::random()
 {
   return readRegister(REG_RSSI_WIDEBAND);
 }
 
-void LoRaClass::setPins(int ss, int reset, int dio0)
+inline void LoRaClass::setPins(int ss, int reset, int dio0)
 {
   _ss = ss;
   _reset = reset;
   _dio0 = dio0;
 }
 
-void LoRaClass::setSPI(SPIClass& spi)
+inline void LoRaClass::setSPI(SPIClass& spi)
 {
   _spi = &spi;
 }
 
-void LoRaClass::setSPIFrequency(uint32_t frequency)
+inline void LoRaClass::setSPIFrequency(uint32_t frequency)
 {
   _spiSettings = SPISettings(frequency, MSBFIRST, SPI_MODE0);
 }
 
 void LoRaClass::dumpRegisters(Stream& out)
 {
-  for (int i = 0; i < 128; i++) {
+  for (int i{0}; i < 128; i++) {
     out.print("0x");
     out.print(i, HEX);
     out.print(": 0x");
@@ -720,14 +720,14 @@ void LoRaClass::dumpRegisters(Stream& out)
   }
 }
 
-void LoRaClass::explicitHeaderMode()
+inline void LoRaClass::explicitHeaderMode()
 {
   _implicitHeaderMode = 0;
 
   writeRegister(REG_MODEM_CONFIG_1, readRegister(REG_MODEM_CONFIG_1) & 0xfe);
 }
 
-void LoRaClass::implicitHeaderMode()
+inline void LoRaClass::implicitHeaderMode()
 {
   _implicitHeaderMode = 1;
 
@@ -736,7 +736,7 @@ void LoRaClass::implicitHeaderMode()
 
 void LoRaClass::handleDio0Rise()
 {
-  int irqFlags = readRegister(REG_IRQ_FLAGS);
+  const int irqFlags = readRegister(REG_IRQ_FLAGS);
 
   // clear IRQ's
   writeRegister(REG_IRQ_FLAGS, irqFlags);
@@ -752,7 +752,7 @@ void LoRaClass::handleDio0Rise()
       _packetIndex = 0;
 
       // read packet length
-      int packetLength = _implicitHeaderMode ? readRegister(REG_PAYLOAD_LENGTH) : readRegister(REG_RX_NB_BYTES);
+      const int packetLength = _implicitHeaderMode ? readRegister(REG_PAYLOAD_LENGTH) : readRegister(REG_RX_NB_BYTES);
 
       // set FIFO address to current RX address
       writeRegister(REG_FIFO_ADDR_PTR, readRegister(REG_FIFO_RX_CURRENT_ADDR));
@@ -768,24 +768,22 @@ void LoRaClass::handleDio0Rise()
   }
 }
 
-uint8_t LoRaClass::readRegister(uint8_t address)
+inline uint8_t LoRaClass::readRegister(uint8_t address)
 {
   return singleTransfer(address & 0x7f, 0x00);
 }
 
-void LoRaClass::writeRegister(uint8_t address, uint8_t value)
+inline void LoRaClass::writeRegister(uint8_t address, uint8_t value)
 {
   singleTransfer(address | 0x80, value);
 }
 
 uint8_t LoRaClass::singleTransfer(uint8_t address, uint8_t value)
 {
-  uint8_t response;
-
   _spi->beginTransaction(_spiSettings);
   digitalWrite(_ss, LOW);
   _spi->transfer(address);
-  response = _spi->transfer(value);
+  const uint8_t response = _spi->transfer(value);
   digitalWrite(_ss, HIGH);
   _spi->endTransaction();
 
